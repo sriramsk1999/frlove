@@ -1,0 +1,19 @@
+{
+    "HPL" : "H P Lovecraft",
+    "JA" : "Jane Austen",
+    "GKC" : "G K Chesterton",
+    "RK" : "Rudyard Kipling",
+    "CD" : "Charles Dickens",
+
+    "VH" : "Victor Hugo",
+    "AD" : "Alexandre Dumas",
+    "VOL" : "Voltaire",
+    "HDB" : "Honore de Balzac",
+    "EZ" : "Emile Zola",
+
+    "JWG" : "Johann Wolfgang von Goethe",
+    "TM" : "Thomas Mann",
+    "ALD" : "Alfred Doblin",
+    "RMR" : "Rainer Maria Rilke",
+    "HH" : "Herman Hesse"
+}
