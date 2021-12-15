@@ -13,6 +13,8 @@ htmlcov
 teacher-*bin
 cc*300.vec
 
+.venv
+
 data/raw
 data/base
 data/target
