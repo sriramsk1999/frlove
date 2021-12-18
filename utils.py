@@ -25,7 +25,7 @@ class projector_SIMCLR(nn.Module):
         return self.fc2(F.relu(self.fc1(x)))
 
 
-# Ported from https://github.com/facebookresearch/fastText/blob/master/python/doc/examples/FastTextEmbeddingBag.py
+# Adapted from https://github.com/facebookresearch/fastText/blob/master/python/doc/examples/FastTextEmbeddingBag.py
 class FastTextEmbeddingBag(EmbeddingBag):
     """Class for loading FastText embeddings into PyTorch for finetuning."""
 
@@ -36,8 +36,10 @@ class FastTextEmbeddingBag(EmbeddingBag):
         super().__init__(input_matrix_shape[0], input_matrix_shape[1])
         self.weight.data.copy_(torch.FloatTensor(input_matrix))
 
-    def forward(self, words):
-        """Forward pass."""
+    def forward(self, sent):
+        """Forward pass. Compute sentence vector from list of word vectors."""
+        words = sent.split(" ")
+        words.append("</s>")
         word_subinds = np.empty([0], dtype=np.int64)
         word_offsets = [0]
         for word in words:
@@ -47,7 +49,9 @@ class FastTextEmbeddingBag(EmbeddingBag):
         word_offsets = word_offsets[:-1]
         ind = Variable(torch.LongTensor(word_subinds))
         offsets = Variable(torch.LongTensor(word_offsets))
-        return super().forward(ind, offsets)
+        word_vectors = super().forward(ind, offsets)
+        sent_vector = torch.mean(word_vectors, dim=0)
+        return sent_vector
 
 
 # ported from https://github.com/sthalles/SimCLR/blob/master/loss/nt_xent.py

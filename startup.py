@@ -95,6 +95,9 @@ def main(args):
     feature_dim = model.get_dimension()
     num_classes = len(model.labels)
 
+    # Backbone of FastText model
+    backbone = FastTextEmbeddingBag(model)
+
     # the student classifier head
     clf = nn.Linear(feature_dim, num_classes).cuda()
 
