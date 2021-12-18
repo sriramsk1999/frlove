@@ -1,119 +1,152 @@
-"""Various utility classes"""
+"""Utility functions"""
+import logging
+import datetime
+import time
+import os
+
+import pandas as pd
 import torch
-from torch import nn
-from torch.nn.modules.sparse import EmbeddingBag
-from torch.autograd import Variable
-from torch.nn import functional as F
-import numpy as np
 
 
-class projector_SIMCLR(nn.Module):
-    """
-    The projector for SimCLR. This is added on top of a backbone for SimCLR Training
-    """
+def accuracy(
+    logits,
+    ground_truth,
+    topk=[
+        1,
+    ],
+):
+    assert len(logits) == len(ground_truth)
+    # this function will calculate per class acc
+    # average per class acc and acc
 
-    def __init__(self, in_dim, out_dim):
-        super(projector_SIMCLR, self).__init__()
-        self.in_dim = in_dim
-        self.out_dim = out_dim
+    n, d = logits.shape
 
-        self.fc1 = nn.Linear(in_dim, in_dim)
-        self.fc2 = nn.Linear(in_dim, out_dim)
+    label_unique = torch.unique(ground_truth)
+    acc = {}
+    acc["average"] = torch.zeros(len(topk))
+    acc["per_class_average"] = torch.zeros(len(topk))
+    acc["per_class"] = [[] for _ in label_unique]
+    acc["gt_unique"] = label_unique
+    acc["topk"] = topk
+    acc["num_classes"] = d
 
-    def forward(self, x):
-        """Forward pass."""
-        return self.fc2(F.relu(self.fc1(x)))
+    max_k = max(topk)
+    argsort = torch.argsort(logits, dim=1, descending=True)[:, : min([max_k, d])]
+    correct = (argsort == ground_truth.view(-1, 1)).float()
 
+    for indi, i in enumerate(label_unique):
+        ind = torch.nonzero(ground_truth == i, as_tuple=False).view(-1)
+        correct_target = correct[ind]
 
-# Adapted from https://github.com/facebookresearch/fastText/blob/master/python/doc/examples/FastTextEmbeddingBag.py
-class FastTextEmbeddingBag(EmbeddingBag):
-    """Class for loading FastText embeddings into PyTorch for finetuning."""
+        # calculate topk
+        for indj, j in enumerate(topk):
+            num_correct_partial = torch.sum(correct_target[:, :j]).item()
+            acc_partial = num_correct_partial / len(correct_target)
+            acc["average"][indj] += num_correct_partial
+            acc["per_class_average"][indj] += acc_partial
+            acc["per_class"][indi].append(acc_partial * 100)
 
-    def __init__(self, model):
-        self.model = model
-        input_matrix = self.model.get_input_matrix()
-        input_matrix_shape = input_matrix.shape
-        super().__init__(input_matrix_shape[0], input_matrix_shape[1])
-        self.weight.data.copy_(torch.FloatTensor(input_matrix))
+    acc["average"] = acc["average"] / n * 100
+    acc["per_class_average"] = acc["per_class_average"] / len(label_unique) * 100
 
-    def forward(self, sent):
-        """Forward pass. Compute sentence vector from list of word vectors."""
-        words = sent.split(" ")
-        words.append("</s>")
-        word_subinds = np.empty([0], dtype=np.int64)
-        word_offsets = [0]
-        for word in words:
-            _, subinds = self.model.get_subwords(word)
-            word_subinds = np.concatenate((word_subinds, subinds))
-            word_offsets.append(word_offsets[-1] + len(subinds))
-        word_offsets = word_offsets[:-1]
-        ind = Variable(torch.LongTensor(word_subinds))
-        offsets = Variable(torch.LongTensor(word_offsets))
-        word_vectors = super().forward(ind, offsets)
-        sent_vector = torch.mean(word_vectors, dim=0)
-        return sent_vector
+    return acc
 
 
-# ported from https://github.com/sthalles/SimCLR/blob/master/loss/nt_xent.py
-class NTXentLoss(torch.nn.Module):
-    def __init__(self, device, batch_size, temperature, use_cosine_similarity):
-        super(NTXentLoss, self).__init__()
-        self.batch_size = batch_size
-        self.temperature = temperature
-        self.device = device
-        self.softmax = torch.nn.Softmax(dim=-1)
-        self.mask_samples_from_same_repr = self._get_correlated_mask().type(torch.bool)
-        self.similarity_function = self._get_similarity_function(use_cosine_similarity)
-        self.criterion = torch.nn.CrossEntropyLoss(reduction="sum")
+def create_logger(fname, logger_name):
+    """Create logger."""
+    # Get a logger with name logger_name
+    logger = logging.getLogger(logger_name)
 
-    def _get_similarity_function(self, use_cosine_similarity):
-        if use_cosine_similarity:
-            self._cosine_similarity = torch.nn.CosineSimilarity(dim=-1)
-            return self._cosine_simililarity
-        else:
-            return self._dot_simililarity
+    # File handler for log
+    hdlr = logging.FileHandler(fname)
+    # Format of the logging information
+    formatter = logging.Formatter("%(levelname)s %(message)s")
 
-    def _get_correlated_mask(self):
-        diag = np.eye(2 * self.batch_size)
-        l1 = np.eye((2 * self.batch_size), 2 * self.batch_size, k=-self.batch_size)
-        l2 = np.eye((2 * self.batch_size), 2 * self.batch_size, k=self.batch_size)
-        mask = torch.from_numpy((diag + l1 + l2))
-        mask = (1 - mask).type(torch.bool)
-        return mask.to(self.device)
+    hdlr.setFormatter(formatter)
+    logger.addHandler(hdlr)
 
-    @staticmethod
-    def _dot_simililarity(x, y):
-        v = torch.tensordot(x.unsqueeze(1), y.T.unsqueeze(0), dims=2)
-        # x shape: (N, 1, C)
-        # y shape: (1, C, 2N)
-        # v shape: (N, 2N)
-        return v
+    # Set the level to logging info, meaning anything information
+    # with information level above info will be logged
+    logger.setLevel(logging.INFO)
 
-    def _cosine_simililarity(self, x, y):
-        # x shape: (N, 1, C)
-        # y shape: (1, 2N, C)
-        # v shape: (N, 2N)
-        v = self._cosine_similarity(x.unsqueeze(1), y.unsqueeze(0))
-        return v
+    return logger
 
-    def forward(self, zis, zjs):
-        representations = torch.cat([zjs, zis], dim=0)
 
-        similarity_matrix = self.similarity_function(representations, representations)
+class savelog:
+    """Saves training log to csv"""
 
-        # filter out the scores from the positive samples
-        l_pos = torch.diag(similarity_matrix, self.batch_size)
-        r_pos = torch.diag(similarity_matrix, -self.batch_size)
-        positives = torch.cat([l_pos, r_pos]).view(2 * self.batch_size, 1)
+    INCREMENTAL_UPDATE_TIME = 0
 
-        negatives = similarity_matrix[self.mask_samples_from_same_repr].view(
-            2 * self.batch_size, -1
+    def __init__(self, directory, name):
+        self.file_path = os.path.join(
+            directory,
+            "{}_{:%Y-%m-%d_%H:%M:%S}.csv".format(name, datetime.datetime.now()),
         )
+        self.data = {}
+        self.last_update_time = time.time() - self.INCREMENTAL_UPDATE_TIME
 
-        logits = torch.cat((positives, negatives), dim=1)
-        logits /= self.temperature
+    def record(self, step, value_dict):
+        self.data[step] = value_dict
+        if time.time() - self.last_update_time >= self.INCREMENTAL_UPDATE_TIME:
+            self.last_update_time = time.time()
+            self.save()
 
-        labels = torch.zeros(2 * self.batch_size).to(self.device).long()
-        loss = self.criterion(logits, labels)
+    def save(self):
+        df = pd.DataFrame.from_dict(self.data, orient="index").to_csv(self.file_path)
 
-        return loss / (2 * self.batch_size)
+
+class AverageMeterSet:
+    def __init__(self):
+        self.meters = {}
+
+    def __getitem__(self, key):
+        return self.meters[key]
+
+    def update(self, name, value, n=1):
+        if not name in self.meters:
+            self.meters[name] = AverageMeter()
+        self.meters[name].update(value, n)
+
+    def reset(self):
+        for meter in self.meters.values():
+            meter.reset()
+
+    def values(self, postfix=""):
+        return {name + postfix: meter.val for name, meter in self.meters.items()}
+
+    def averages(self, postfix="/avg"):
+        return {name + postfix: meter.avg for name, meter in self.meters.items()}
+
+    def sums(self, postfix="/sum"):
+        return {name + postfix: meter.sum for name, meter in self.meters.items()}
+
+    def counts(self, postfix="/count"):
+        return {name + postfix: meter.count for name, meter in self.meters.items()}
+
+
+class AverageMeter:
+    """Computes and stores the average and current value"""
+
+    def __init__(self):
+        self.reset()
+
+    def reset(self):
+        self.val = 0
+        self.avg = 0
+        self.sum = 0
+        self.count = 0
+
+    def update(self, val, n=1):
+        """
+        val is the average value
+        n : the number of items used to calculate the average
+        """
+        self.val = val
+        self.sum += val * n
+        self.count += n
+        self.avg = self.sum / self.count
+
+    def __format__(self, format):
+        return "{self.val:{format}} ({self.avg:{format}})".format(
+            self=self, format=format
+        )
