@@ -1,32 +1,18 @@
+""" STARTUP for text. Trains and saves a student model. """
 import argparse
 import os
 import random
 
 import torch
-import torch.nn as nn
+from torch import nn
 from torch.nn import functional as F
 from torch.utils.data import DataLoader
 import numpy as np
 import fasttext
-
 from sklearn.model_selection import train_test_split
+from tqdm import tqdm
 
-
-class projector_SIMCLR(nn.Module):
-    """
-    The projector for SimCLR. This is added on top of a backbone for SimCLR Training
-    """
-
-    def __init__(self, in_dim, out_dim):
-        super(projector_SIMCLR, self).__init__()
-        self.in_dim = in_dim
-        self.out_dim = out_dim
-
-        self.fc1 = nn.Linear(in_dim, in_dim)
-        self.fc2 = nn.Linear(in_dim, out_dim)
-
-    def forward(self, x):
-        return self.fc2(F.relu(self.fc1(x)))
+from utils import FastTextEmbeddingBag, NTXentLoss, projector_SIMCLR
 
 
 def pseudolabel_data(model, dataset):
@@ -106,8 +92,8 @@ def main(args):
 
     # Load Teacher
     model = fasttext.load_model(f"teacher-{args.base}.bin")
-    feature_dim = model.dim
-    num_classes = model.labels
+    feature_dim = model.get_dimension()
+    num_classes = len(model.labels)
 
     # the student classifier head
     clf = nn.Linear(feature_dim, num_classes).cuda()
@@ -126,7 +112,100 @@ def main(args):
     trainloader, valloader = create_dataloader(target_dataset, args)
     base_trainloader, base_valloader = create_dataloader(base_dataset, args)
 
-    return
+    ############################
+    # Loss Function and Optimizer
+    ############################
+
+    criterion = NTXentLoss("cuda", args.bsize, args.temp, True)
+    criterion_val = NTXentLoss("cuda", args.bsize, args.temp, True)
+
+    optimizer = torch.optim.SGD(
+        [
+            {"params": backbone.parameters()},
+            {"params": clf.parameters()},
+            {"params": clf_SIMCLR.parameters()},
+        ],
+        lr=0.1,
+        momentum=0.9,
+        weight_decay=args.wd,
+        nesterov=False,
+    )
+
+    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
+        optimizer,
+        mode="min",
+        factor=0.5,
+        patience=10,
+        verbose=False,
+        cooldown=10,
+        threshold_mode="rel",
+        threshold=1e-4,
+        min_lr=1e-5,
+    )
+
+    ############################
+    # Train
+    ############################
+    for epoch in tqdm(range(args.epochs)):
+        perf = train(
+            backbone,
+            clf,
+            clf_SIMCLR,
+            optimizer,
+            trainloader,
+            base_trainloader,
+            criterion,
+            epoch,
+            args.epochs,
+            logger,
+            trainlog,
+            args,
+        )
+
+        scheduler.step(perf["Loss/avg"])
+
+        if (epoch + 1) % args.save_freq == 0:
+            checkpoint(
+                backbone,
+                clf,
+                clf_SIMCLR,
+                optimizer,
+                scheduler,
+                os.path.join(args.dir, f"checkpoint_{epoch + 1}.pkl"),
+                epoch + 1,
+            )
+
+        if (epoch + 1) % args.eval_freq == 0:
+            performance_val = validate(
+                backbone,
+                clf,
+                clf_SIMCLR,
+                valloader,
+                base_valloader,
+                criterion_val,
+                epoch + 1,
+                args.epochs,
+                logger,
+                vallog,
+                args,
+                postfix="Validation",
+            )
+
+            loss_val = performance_val["Loss_test/avg"]
+
+            if best_loss > loss_val:
+                best_epoch = epoch + 1
+                checkpoint(
+                    backbone,
+                    clf,
+                    clf_SIMCLR,
+                    optimizer,
+                    scheduler,
+                    os.path.join(args.dir, "checkpoint_best.pkl"),
+                    best_epoch,
+                )
+                logger.info(f"*** Best model checkpointed at Epoch {best_epoch}")
+                best_loss = loss_val
 
 
 if __name__ == "__main__":
@@ -139,13 +218,23 @@ if __name__ == "__main__":
         help="Projection Dimension for SimCLR",
     )
     parser.add_argument(
+        "--num_workers", type=int, default=8, help="Number of workers for dataloader"
+    )
+    parser.add_argument("--bsize", type=int, default=16, help="batch_size for STARTUP")
+    parser.add_argument("--temp", type=float, default=1, help="Temperature of SIMCLR")
+    parser.add_argument(
+        "--wd", type=float, default=1e-4, help="Weight decay for the model"
+    )
+    parser.add_argument(
+        "--epochs", type=int, default=10, help="Number of training epochs"
+    )
+    parser.add_argument(
+        "--save_freq", type=int, default=5, help="Frequency (in epoch) to save"
+    )
+    parser.add_argument(
         "--base",
         help="language of base dataset/teacher model e.g. French ='fr' ",
         required=True,
     )
-    parser.add_argument(
-        "--num_workers", type=int, default=8, help="Number of workers for dataloader"
-    )
-    parser.add_argument("--bsize", type=int, default=16, help="batch_size for STARTUP")
     arguments = parser.parse_args()
     main(arguments)
