@@ -13,8 +13,12 @@ import numpy as np
 import fasttext
 from sklearn.model_selection import train_test_split
 from tqdm import tqdm
+import nltk
+import wget
+import gensim
+import textaugment
 
-from util_classes import FastTextEmbeddingBag, NTXentLoss, projector_SIMCLR
+from util_classes import FastTextEmbeddingBag, NTXentLoss, projector_SIMCLR, apply_twice
 import utils
 
 
@@ -48,7 +52,7 @@ def load_datasets(model, base, target):
     base_dataset = [(b.split(" ")[0], " ".join(b.split(" ")[1:])) for b in base_dataset]
 
     # Load target dataset
-    target_datafile = f"data/base/{target}.txt"
+    target_datafile = f"data/target/unlabeled_{target}.txt"
     with open(target_datafile, "r", encoding="utf-8") as datafile:
         target_dataset = datafile.read().split("\n")
 
@@ -398,6 +402,15 @@ def main(args):
     # seed the random number generator
     seed_everything(args.seed)
 
+    # Download resources for text transformations
+    nltk.download(["punkt", "wordnet", "averaged_perceptron_tagger"])
+    word2vec_file = "GoogleNews-vectors-negative300.bin.gz"
+    if not os.path.isfile(word2vec_file):
+        wget.download(f"https://s3.amazonaws.com/dl4j-distribution/{word2vec_file}")
+    word2vec = gensim.models.KeyedVectors.load_word2vec_format(
+        f"{word2vec_file}", binary=True
+    )
+
     ###########################
     # Create Models
     ###########################
@@ -432,7 +445,6 @@ def main(args):
     ############################
 
     criterion = NTXentLoss("cuda", args.bsize, args.temp, True)
-    criterion_val = NTXentLoss("cuda", args.bsize, args.temp, True)
 
     optimizer = torch.optim.SGD(
         [
@@ -497,7 +509,7 @@ def main(args):
                 clf_SIMCLR,
                 valloader,
                 base_valloader,
-                criterion_val,
+                criterion,
                 epoch + 1,
                 args.epochs,
                 logger,
@@ -525,6 +537,9 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="STARTUP")
+    parser.add_argument(
+        "--dir", type=str, default=".", help="directory to save the checkpoints"
+    )
     parser.add_argument("--seed", type=int, default=42, help="Seed for randomness")
     parser.add_argument(
         "--projection_dim",
@@ -549,6 +564,11 @@ if __name__ == "__main__":
     parser.add_argument(
         "--base",
         help="language of base dataset/teacher model e.g. French ='fr' ",
+        required=True,
+    )
+    parser.add_argument(
+        "--target",
+        help="language of target dataset e.g. English ='fr' ",
         required=True,
     )
     arguments = parser.parse_args()

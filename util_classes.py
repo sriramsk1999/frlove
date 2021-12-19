@@ -7,6 +7,24 @@ from torch.nn import functional as F
 import numpy as np
 
 
+class apply_twice:
+    """
+    A wrapper for torchvision transform. The transform is applied twice for
+    SimCLR training
+    """
+
+    def __init__(self, transform, transform2=None):
+        self.transform = transform
+
+        if transform2 is not None:
+            self.transform2 = transform2
+        else:
+            self.transform2 = transform
+
+    def __call__(self, img):
+        return self.transform(img), self.transform2(img)
+
+
 class projector_SIMCLR(nn.Module):
     """
     The projector for SimCLR. This is added on top of a backbone for SimCLR Training
