@@ -11,7 +11,7 @@ htmlcov
 *org
 
 teacher-*bin
-cc*300.vec
+cc*300.vec*
 GoogleNews-vectors-negative300.bin.gz
 
 .venv

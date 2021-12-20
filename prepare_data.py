@@ -124,5 +124,5 @@ if __name__ == "__main__":
     )
     create_target_dataset(args.target)
     print(
-        f"Base dataset for {args.target} created.\n------------------------------------"
+        f"Target dataset for {args.target} created.\n------------------------------------"
     )
