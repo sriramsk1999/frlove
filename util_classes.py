@@ -7,22 +7,24 @@ from torch.nn import functional as F
 import numpy as np
 
 
-class apply_twice:
+class GutenbergLangDataset(torch.utils.data.Dataset):
     """
-    A wrapper for torchvision transform. The transform is applied twice for
-    SimCLR training
+    Project Gutenberg dataset. Transform applied twice for SimCLR training.
+    Only applied on target dataset.
+    Transforms used are from textaugment
     """
 
-    def __init__(self, transform, transform2=None):
+    def __init__(self, dataset, transform, transform2):
+        self.dataset = dataset
         self.transform = transform
+        self.transform2 = transform2
 
-        if transform2 is not None:
-            self.transform2 = transform2
-        else:
-            self.transform2 = transform
+    def __len__(self):
+        return len(self.dataset)
 
-    def __call__(self, img):
-        return self.transform(img), self.transform2(img)
+    def __getitem__(self, idx):
+        data = self.dataset[idx]
+        return self.transform(data), self.transform2(data)
 
 
 class projector_SIMCLR(nn.Module):
@@ -54,22 +56,25 @@ class FastTextEmbeddingBag(EmbeddingBag):
         super().__init__(input_matrix_shape[0], input_matrix_shape[1])
         self.weight.data.copy_(torch.FloatTensor(input_matrix))
 
-    def forward(self, sent):
-        """Forward pass. Compute sentence vector from list of word vectors."""
-        words = sent.split(" ")
-        words.append("</s>")
+    def forward(self, batch):
+        """Forward pass. Compute sentence vectors from batch of sentences."""
+        batch = [sent.split(" ").append("</s>") for sent in batch]
         word_subinds = np.empty([0], dtype=np.int64)
         word_offsets = [0]
-        for word in words:
-            _, subinds = self.model.get_subwords(word)
-            word_subinds = np.concatenate((word_subinds, subinds))
-            word_offsets.append(word_offsets[-1] + len(subinds))
-        word_offsets = word_offsets[:-1]
-        ind = Variable(torch.LongTensor(word_subinds))
-        offsets = Variable(torch.LongTensor(word_offsets))
-        word_vectors = super().forward(ind, offsets)
-        sent_vector = torch.mean(word_vectors, dim=0)
-        return sent_vector
+        sents_vector = []
+        for sent in batch:
+            for word in sent:
+                _, subinds = self.model.get_subwords(word)
+                word_subinds = np.concatenate((word_subinds, subinds))
+                word_offsets.append(word_offsets[-1] + len(subinds))
+            word_offsets = word_offsets[:-1]
+            ind = Variable(torch.LongTensor(word_subinds))
+            offsets = Variable(torch.LongTensor(word_offsets))
+            word_vectors = super().forward(ind, offsets)
+            sent_vector = torch.mean(word_vectors, dim=0)
+            sents_vector.append(sent_vector)
+        sents_vector = torch.cat(sents_vector)
+        return sents_vector
 
 
 # ported from https://github.com/sthalles/SimCLR/blob/master/loss/nt_xent.py
