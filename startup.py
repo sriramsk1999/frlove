@@ -8,17 +8,23 @@ import time
 import torch
 from torch import nn
 from torch.nn import functional as F
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Dataset
 import numpy as np
 import fasttext
 from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import LabelEncoder
 from tqdm import tqdm
 import nltk
 import wget
 import gensim
 import textaugment
 
-from util_classes import FastTextEmbeddingBag, NTXentLoss, projector_SIMCLR, apply_twice
+from util_classes import (
+    FastTextEmbeddingBag,
+    NTXentLoss,
+    projector_SIMCLR,
+    GutenbergLangDataset,
+)
 import utils
 
 
@@ -26,8 +32,15 @@ def pseudolabel_data(model, dataset):
     """Soft-label target dataset with base classes."""
     num_labels = len(model.labels)
     pseudolabels = model.predict(dataset, k=num_labels)
-    # Convert to list of tuples [(data, labels, probs), ...]
-    pseudolabeled_data = list(zip(dataset, *pseudolabels))
+    # Convert to list of tuples [(labels, probs), ...]
+    pseudolabels = list(zip(*pseudolabels))
+    # Zip together labels and probs [ [(label, prob)...], ... ].
+    # Sort each pseudolabel as LabelEncoder integer-encodes labels in sorted order
+    # Therefore, probabilities are expected in the same order.
+    pseudolabels = [sorted(zip(*p)) for p in pseudolabels]
+    # Extract probabilities and form dataset [(data, probs), ...]
+    pseudolabel_probs = [[p[q][1] for q in range(len(p))] for p in pseudolabels]
+    pseudolabeled_data = list(zip(dataset, pseudolabel_probs))
     return pseudolabeled_data
 
 
@@ -41,7 +54,7 @@ def seed_everything(seed):
     random.seed(seed)
 
 
-def load_datasets(model, base, target):
+def load_datasets(model, base, target, augment1, augment2):
     """Load base and target datasets."""
 
     # Load base dataset
@@ -49,7 +62,14 @@ def load_datasets(model, base, target):
     with open(base_datafile, "r", encoding="utf-8") as datafile:
         base_dataset = datafile.read().split("\n")
     # Separate label and data
-    base_dataset = [(b.split(" ")[0], " ".join(b.split(" ")[1:])) for b in base_dataset]
+    base_labels = [b.split(" ")[0] for b in base_dataset]
+    base_data = [" ".join(b.split(" ")[1:]) for b in base_dataset]
+    # Integer encode labels
+    le = LabelEncoder()
+    base_labels = le.fit_transform(base_labels)
+    # classes = le.classes_ # Fetch classes
+    # Join base_dataset as [(data, label), ...]
+    base_dataset = list(zip(base_data, base_labels))
 
     # Load target dataset
     target_datafile = f"data/target/unlabeled_{target}.txt"
@@ -58,6 +78,7 @@ def load_datasets(model, base, target):
 
     # Pseudolabel target dataset
     target_dataset = pseudolabel_data(model, target_dataset)
+    target_dataset = GutenbergLangDataset(target_dataset, augment1, augment2)
 
     return base_dataset, target_dataset
 
@@ -410,6 +431,8 @@ def main(args):
     word2vec = gensim.models.KeyedVectors.load_word2vec_format(
         f"{word2vec_file}", binary=True
     )
+    word2vec = textaugment.Word2vec(model=word2vec, runs=2)
+    wordnet = textaugment.Wordnet(runs=2, n=True)
 
     ###########################
     # Create Models
@@ -434,7 +457,9 @@ def main(args):
     ###########################
 
     # Datasets
-    base_dataset, target_dataset = load_datasets(model, args.base, args.target)
+    base_dataset, target_dataset = load_datasets(
+        model, args.base, args.target, word2vec.augment, wordnet.augment
+    )
 
     # DataLoaders
     trainloader, valloader = create_dataloader(target_dataset, args)
