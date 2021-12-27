@@ -60,7 +60,7 @@ class FastTextEmbeddingBag(EmbeddingBag):
 
     def forward(self, batch):
         """Forward pass. Compute sentence vectors from batch of sentences."""
-        batch = [sent.split(" ") + "</s>" for sent in batch]
+        batch = [sent.split(" ") + ["</s>"] for sent in batch]
         sents_vector = []
         for sent in batch:
             word_subinds = np.empty([0], dtype=np.int64)

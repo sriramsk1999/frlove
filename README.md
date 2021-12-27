@@ -29,3 +29,7 @@ python train_teacher.py --base fr
 ```
 
 4. Run STARTUP (WIP)
+
+```sh
+python startup.py --base fr --target en
+```

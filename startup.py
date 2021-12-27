@@ -160,7 +160,6 @@ def train(
             base_loader_iter = iter(base_trainloader)
             X_base, y_base = base_loader_iter.next()
 
-        X_base = X_base.cuda()
         y_base = y_base.cuda()
 
         optimizer.zero_grad()
