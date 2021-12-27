@@ -17,14 +17,16 @@ class GutenbergLangDataset(torch.utils.data.Dataset):
     def __init__(self, dataset, transform, transform2):
         self.dataset = dataset
         self.transform = transform
-        self.transform2 = transform2
+        if transform2 is None:
+            self.transform2 = transform
 
     def __len__(self):
         return len(self.dataset)
 
     def __getitem__(self, idx):
-        data = self.dataset[idx]
-        return self.transform(data), self.transform2(data)
+        data = self.dataset[idx][0]
+        pseudolabel = torch.FloatTensor(self.dataset[idx][1])
+        return (self.transform(data), self.transform2(data)), pseudolabel
 
 
 class projector_SIMCLR(nn.Module):
@@ -58,11 +60,11 @@ class FastTextEmbeddingBag(EmbeddingBag):
 
     def forward(self, batch):
         """Forward pass. Compute sentence vectors from batch of sentences."""
-        batch = [sent.split(" ").append("</s>") for sent in batch]
-        word_subinds = np.empty([0], dtype=np.int64)
-        word_offsets = [0]
+        batch = [sent.split(" ") + "</s>" for sent in batch]
         sents_vector = []
         for sent in batch:
+            word_subinds = np.empty([0], dtype=np.int64)
+            word_offsets = [0]
             for word in sent:
                 _, subinds = self.model.get_subwords(word)
                 word_subinds = np.concatenate((word_subinds, subinds))
@@ -73,7 +75,7 @@ class FastTextEmbeddingBag(EmbeddingBag):
             word_vectors = super().forward(ind, offsets)
             sent_vector = torch.mean(word_vectors, dim=0)
             sents_vector.append(sent_vector)
-        sents_vector = torch.cat(sents_vector)
+        sents_vector = torch.stack(sents_vector)
         return sents_vector
 
 

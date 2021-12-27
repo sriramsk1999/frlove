@@ -54,7 +54,7 @@ def seed_everything(seed):
     random.seed(seed)
 
 
-def load_datasets(model, base, target, augment1, augment2):
+def load_datasets(model, base, target, augment1, augment2=None):
     """Load base and target datasets."""
 
     # Load base dataset
@@ -132,7 +132,6 @@ def train(
     logger,
     trainlog,
     args,
-    turn_off_sync=False,
 ):
 
     meters = utils.AverageMeterSet()
@@ -152,8 +151,6 @@ def train(
         current_lr = optimizer.param_groups[0]["lr"]
         meters.update("lr", current_lr, 1)
 
-        X1 = X1.cuda()
-        X2 = X2.cuda()
         y = y.cuda()
 
         # Get the data from the base dataset
@@ -169,13 +166,13 @@ def train(
         optimizer.zero_grad()
 
         # cross entropy loss on the base dataset
-        features_base = model(X_base)
+        features_base = model(X_base).cuda()
         logits_base = clf(features_base)
         log_probability_base = F.log_softmax(logits_base, dim=1)
         loss_base = nll_criterion(log_probability_base, y_base)
 
-        f1 = model(X1)
-        f2 = model(X2)
+        f1 = model(X1).cuda()
+        f2 = model(X2).cuda()
 
         # SIMCLR Loss on the target dataset
         z1 = clf_SIMCLR(f1)
@@ -184,8 +181,8 @@ def train(
         loss_SIMCLR = criterion_SIMCLR(z1, z2)
 
         # Pseudolabel loss on the target dataset
-        logits_xtask_1 = clf(f1)
-        logits_xtask_2 = clf(f2)
+        logits_xtask_1 = clf(f1).cuda()
+        logits_xtask_2 = clf(f2).cuda()
         log_probability_1 = F.log_softmax(logits_xtask_1, dim=1)
         log_probability_2 = F.log_softmax(logits_xtask_2, dim=1)
 
@@ -286,7 +283,6 @@ def validate(
     testlog,
     args,
     postfix="Validation",
-    turn_off_sync=False,
 ):
     meters = utils.AverageMeterSet()
     model.eval()
@@ -307,12 +303,10 @@ def validate(
     # Compute the loss for the target dataset
     with torch.no_grad():
         for _, ((Xtest, Xrand), y) in enumerate(testloader):
-            Xtest = Xtest.cuda()
-            Xrand = Xrand.cuda()
             y = y.cuda()
 
-            ftest = model(Xtest)
-            frand = model(Xrand)
+            ftest = model(Xtest).cuda()
+            frand = model(Xrand).cuda()
 
             ztest = clf_simclr(ftest)
             zrand = clf_simclr(frand)
@@ -341,10 +335,9 @@ def validate(
     with torch.no_grad():
         # Compute the loss on the source base dataset
         for X_base, y_base in base_loader:
-            X_base = X_base.cuda()
             y_base = y_base.cuda()
 
-            features = model(X_base)
+            features = model(X_base).cuda()
             logits_base = clf(features)
 
             logits_base_all.append(logits_base)
@@ -425,14 +418,15 @@ def main(args):
 
     # Download resources for text transformations
     nltk.download(["punkt", "wordnet", "averaged_perceptron_tagger"])
-    word2vec_file = "GoogleNews-vectors-negative300.bin.gz"
-    if not os.path.isfile(word2vec_file):
-        wget.download(f"https://s3.amazonaws.com/dl4j-distribution/{word2vec_file}")
-    word2vec = gensim.models.KeyedVectors.load_word2vec_format(
-        f"{word2vec_file}", binary=True
-    )
-    word2vec = textaugment.Word2vec(model=word2vec, runs=2)
-    wordnet = textaugment.Wordnet(runs=2, n=True)
+
+    # word2vec_file = "GoogleNews-vectors-negative300.bin.gz"
+    # if not os.path.isfile(word2vec_file):
+    #     wget.download(f"https://s3.amazonaws.com/dl4j-distribution/{word2vec_file}")
+    # word2vec = gensim.models.KeyedVectors.load_word2vec_format(
+    #     f"{word2vec_file}", binary=True
+    # )
+    # word2vec = textaugment.Word2vec(model=word2vec, runs=2)
+    wordnet = textaugment.Wordnet(runs=3, n=True)
 
     ###########################
     # Create Models
@@ -456,9 +450,12 @@ def main(args):
     # Prepare data
     ###########################
 
-    # Datasets
+    # Datasets - Word2vec removed as it is slow
     base_dataset, target_dataset = load_datasets(
-        model, args.base, args.target, word2vec.augment, wordnet.augment
+        model,
+        args.base,
+        args.target,
+        wordnet.augment,  # word2vec.augment
     )
 
     # DataLoaders
