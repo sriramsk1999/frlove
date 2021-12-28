@@ -110,7 +110,7 @@ def checkpoint(model, clf, clf_SIMCLR, optimizer, scheduler, save_path, epoch):
     Should resume from epoch
     """
     sd = {
-        "model": copy.deepcopy(model.module.state_dict()),
+        "model": copy.deepcopy(model.weight),
         "clf": copy.deepcopy(clf.state_dict()),
         "clf_SIMCLR": copy.deepcopy(clf_SIMCLR.state_dict()),
         "opt": copy.deepcopy(optimizer.state_dict()),
@@ -549,7 +549,7 @@ def main(args):
                 )
                 logger.info(f"*** Best model checkpointed at Epoch {best_epoch}")
                 best_loss = loss_val
-        print("Epoch {epoch} complete!")
+        print(f"Epoch {epoch} complete!")
 
 
 if __name__ == "__main__":
