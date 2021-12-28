@@ -4,6 +4,7 @@ import os
 import random
 import copy
 import time
+import math
 
 import torch
 from torch import nn
@@ -91,12 +92,14 @@ def create_dataloader(dataset, args):
         batch_size=args.bsize,
         num_workers=args.num_workers,
         shuffle=True,
+        drop_last=True,  # SimCLR bug with last smaller batch
     )
     valloader = DataLoader(
         valset,
         batch_size=args.bsize,
         num_workers=args.num_workers,
         shuffle=True,
+        drop_last=True,  # SimCLR bug with last smaller batch
     )
     return trainloader, valloader
 
@@ -145,7 +148,7 @@ def train(
     base_loader_iter = iter(base_trainloader)
 
     end = time.time()
-    for i, ((X1, X2), y) in enumerate(trainloader):
+    for i, ((X1, X2), y) in tqdm(enumerate(trainloader)):
         meters.update("Data_time", time.time() - end)
 
         current_lr = optimizer.param_groups[0]["lr"]
@@ -242,9 +245,6 @@ def train(
 
             logger.info(logger_string)
 
-        if (args.iteration_bp is not None) and (i + 1) == args.iteration_bp:
-            break
-
     logger_string = (
         "Training Epoch: [{epoch}/{epochs}] Step: [{step}] Batch Time: {meters[Batch_time]:.4f} "
         "Data Time: {meters[Data_time]:.4f} Average Loss: {meters[Loss]:.4f} "
@@ -292,10 +292,7 @@ def validate(
     nll_criterion = nn.NLLLoss(reduction="mean")
 
     logits_xtask_test_all = []
-
-    z1s = []
-    z2s = []
-
+    losses_simclr = []
     ys_all = []
 
     end = time.time()
@@ -315,8 +312,7 @@ def validate(
             logits_xtask_test_all.append(logits_xtask_test)
             ys_all.append(y)
 
-            z1s.append(ztest)
-            z2s.append(zrand)
+            losses_simclr.append(criterion_SIMCLR(ztest, zrand))
 
     ys_all = torch.cat(ys_all, dim=0)
     logits_xtask_test_all = torch.cat(logits_xtask_test_all, dim=0)
@@ -325,9 +321,7 @@ def validate(
 
     loss_xtask = criterion_xtask(log_probability, ys_all)
 
-    z1s = torch.cat(z1s, dim=0)
-    z2s = torch.cat(z2s, dim=0)
-    loss_SIMCLR = criterion_SIMCLR(z1s, z2s)
+    loss_SIMCLR = sum(losses_simclr)
 
     logits_base_all = []
     ys_base_all = []
@@ -490,11 +484,12 @@ def main(args):
         threshold=1e-4,
         min_lr=1e-5,
     )
+    best_loss = math.inf
 
     ############################
     # Train
     ############################
-    for epoch in tqdm(range(args.epochs)):
+    for epoch in range(args.epochs):
         perf = train(
             backbone,
             clf,
@@ -554,6 +549,7 @@ def main(args):
                 )
                 logger.info(f"*** Best model checkpointed at Epoch {best_epoch}")
                 best_loss = loss_val
+        print("Epoch {epoch} complete!")
 
 
 if __name__ == "__main__":
@@ -581,6 +577,18 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--save_freq", type=int, default=5, help="Frequency (in epoch) to save"
+    )
+    parser.add_argument(
+        "--print_freq",
+        type=int,
+        default=5,
+        help="Frequency (in step per epoch) to print training stats",
+    )
+    parser.add_argument(
+        "--eval_freq",
+        type=int,
+        default=1,
+        help="Frequency (in epoch) to evaluate on the val set",
     )
     parser.add_argument(
         "--base",
