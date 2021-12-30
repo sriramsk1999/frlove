@@ -28,8 +28,14 @@ python prepare_data.py --base de --target en
 python train_teacher.py --base fr
 ```
 
-4. Run STARTUP (WIP)
+4. Run STARTUP
 
 ```sh
 python startup.py --base fr --target en
+```
+
+5. Evaluate STARTUP and Naive Transfer (WIP)
+
+```sh
+python finetune.py --base fr --target en
 ```

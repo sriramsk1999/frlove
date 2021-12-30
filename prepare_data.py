@@ -84,12 +84,12 @@ def create_target_dataset(lang):
         data = txtfile.read()
 
     data = data.split("\n")
-    unlabeled, labeled = train_test_split(
+    labeled, unlabeled = train_test_split(
         data, test_size=unlabeled_perc, random_state=42
     )
 
     # Remove labels for unlabeled i.e. remove first token when splitting by space
-    unlabeled = [" ".join(l.split(" ")[1:]) for l in labeled]
+    unlabeled = [" ".join(l.split(" ")[1:]) for l in unlabeled]
 
     if not os.path.isdir("data/target"):
         os.mkdir("data/target")

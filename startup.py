@@ -500,7 +500,9 @@ def main(args):
                 clf_SIMCLR,
                 optimizer,
                 scheduler,
-                os.path.join(args.dir, f"checkpoint_{epoch + 1}.pkl"),
+                os.path.join(
+                    args.dir, f"student_{args.base}_{args.target}_{epoch + 1}.pkl"
+                ),
                 epoch + 1,
             )
 
@@ -530,7 +532,9 @@ def main(args):
                     clf_SIMCLR,
                     optimizer,
                     scheduler,
-                    os.path.join(args.dir, "checkpoint_best.pkl"),
+                    os.path.join(
+                        args.dir, "student_{args.base}_{args.target}_best.pkl"
+                    ),
                     best_epoch,
                 )
                 logger.info(f"*** Best model checkpointed at Epoch {best_epoch}")
