@@ -1,7 +1,6 @@
 """ STARTUP for text. Trains and saves a student model. """
 import argparse
 import os
-import random
 import copy
 import time
 import math
@@ -9,15 +8,12 @@ import math
 import torch
 from torch import nn
 from torch.nn import functional as F
-from torch.utils.data import DataLoader, Dataset
-import numpy as np
+from torch.utils.data import DataLoader
 import fasttext
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 from tqdm import tqdm
 import nltk
-import wget
-import gensim
 import textaugment
 
 from util_classes import (
@@ -43,16 +39,6 @@ def pseudolabel_data(model, dataset):
     pseudolabel_probs = [[p[q][1] for q in range(len(p))] for p in pseudolabels]
     pseudolabeled_data = list(zip(dataset, pseudolabel_probs))
     return pseudolabeled_data
-
-
-def seed_everything(seed):
-    """Seed everything for reproducibility"""
-    torch.backends.cudnn.deterministic = True
-    torch.backends.cudnn.benchmark = False
-    torch.manual_seed(seed)
-    torch.cuda.manual_seed(seed)
-    np.random.seed(seed)
-    random.seed(seed)
 
 
 def load_datasets(model, base, target, augment1, augment2=None):
@@ -407,7 +393,7 @@ def main(args):
     vallog = utils.savelog(args.dir, "val")
 
     # seed the random number generator
-    seed_everything(args.seed)
+    utils.seed_everything(args.seed)
 
     # Download resources for text transformations
     nltk.download(["punkt", "wordnet", "averaged_perceptron_tagger"])

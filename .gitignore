@@ -19,3 +19,7 @@ GoogleNews-vectors-negative300.bin.gz
 data/raw
 data/base
 data/target
+
+*pkl
+train_*csv
+val_*csv

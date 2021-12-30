@@ -3,9 +3,11 @@ import logging
 import datetime
 import time
 import os
+import random
 
 import pandas as pd
 import torch
+import numpy as np
 
 
 def accuracy(
@@ -150,3 +152,13 @@ class AverageMeter:
         return "{self.val:{format}} ({self.avg:{format}})".format(
             self=self, format=format
         )
+
+
+def seed_everything(seed):
+    """Seed everything for reproducibility"""
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    np.random.seed(seed)
+    random.seed(seed)

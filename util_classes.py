@@ -142,3 +142,16 @@ class NTXentLoss(torch.nn.Module):
         loss = self.criterion(logits, labels)
 
         return loss / (2 * self.batch_size)
+
+
+class Classifier(nn.Module):
+    """Linear Classifier"""
+
+    def __init__(self, dim, n_way):
+        super(Classifier, self).__init__()
+
+        self.fc = nn.Linear(dim, n_way)
+
+    def forward(self, x):
+        x = self.fc(x)
+        return x
