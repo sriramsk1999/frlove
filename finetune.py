@@ -17,7 +17,6 @@ from util_classes import Classifier, FastTextEmbeddingBag
 
 def finetune(support_loader, query_loader, params):
     """Finetune and evaluate model on dataset."""
-    print("Loading Model: ", params.embedding_load_path)
 
     # Load teacher into FastTextEmbeddingBag
     pretrained_model = fasttext.load_model(f"teacher-{params.base}.bin")
@@ -26,10 +25,10 @@ def finetune(support_loader, query_loader, params):
     # Path to STARTUP embedding. Replaces the fasttext embeddings
     # If not set, equivalent to evaluating naive transfer
     if params.embedding_load_path:
+        print("Loading Model: ", params.embedding_load_path)
         embedding = torch.load(params.embedding_load_path)["model"]
         pretrained_model.weight.data.copy_(embedding)
 
-    pretrained_model.cuda()
     classifier = Classifier(feature_dim, params.n_way).cuda()
 
     loss_fn = nn.CrossEntropyLoss().cuda()
@@ -48,11 +47,12 @@ def finetune(support_loader, query_loader, params):
     # Finetune
     for _ in tqdm(range(total_epoch)):
         for x, y in support_loader:
+            y = y.cuda()
             classifier_opt.zero_grad()
 
             #####################################
 
-            output = pretrained_model(x)
+            output = pretrained_model(x).cuda()
             output = classifier(output)
             loss = loss_fn(output, y)
 
@@ -64,20 +64,20 @@ def finetune(support_loader, query_loader, params):
     pretrained_model.eval()
     classifier.eval()
 
+    pred_list = []
+    outs_list = []
     with torch.no_grad():
         for x, y in query_loader:
-            output = pretrained_model(x)
+            y = y.cuda()
+            output = pretrained_model(x).cuda()
             scores = classifier(output)
-            # dump scores and labels in one list
+            pred_list.append(torch.argmax(scores, dim=1))
+            outs_list.append(y)
 
-    topk_scores, topk_labels = scores.data.topk(1, 1, True, True)
-    topk_ind = topk_labels.cpu().numpy()
-
-    top1_correct = np.sum(topk_ind[:, 0] == y_query)
-    correct_this, count_this = float(top1_correct), len(y_query)
-    acc = correct_this / count_this * 100
-
-    print("Test Acc = %4.2f%%" % (acc))
+    preds = torch.cat(pred_list)
+    outs = torch.cat(outs_list)
+    acc = (preds == outs).type(torch.FloatTensor).mean()
+    return acc
 
 
 def create_eval_dataloaders(params):
@@ -111,7 +111,7 @@ def create_eval_dataloaders(params):
         subset = {auth: sents[start:end] for auth, sents in dataset.items()}
         # Extract n_way
         subset = [
-            (auth, sents)
+            (sents, auth)
             for auth in random.sample(subset.keys(), n_way)
             for sents in subset[auth]
         ]
@@ -142,7 +142,8 @@ def main(params):
 
     utils.seed_everything(params.seed)
     support_loader, query_loader = create_eval_dataloaders(params)
-    # finetune(support_loader, query_loader, params)
+    acc = finetune(support_loader, query_loader, params)
+    print(f"Test Acc = {acc:.2f}%")
 
 
 if __name__ == "__main__":
