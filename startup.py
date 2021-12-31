@@ -533,7 +533,7 @@ def main(args):
                     optimizer,
                     scheduler,
                     os.path.join(
-                        args.dir, "student_{args.base}_{args.target}_best.pkl"
+                        args.dir, f"student_{args.base}_{args.target}_best.pkl"
                     ),
                     best_epoch,
                 )

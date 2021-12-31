@@ -112,8 +112,8 @@ def create_eval_dataloaders(params):
         # Extract n_way
         subset = [
             (auth, sents)
-            for sents in subset[auth]
             for auth in random.sample(subset.keys(), n_way)
+            for sents in subset[auth]
         ]
         subset_loader = torch.utils.data.DataLoader(
             subset,
@@ -137,12 +137,12 @@ def main(params):
     if not os.path.isdir(params.save_dir):
         os.makedirs(params.save_dir)
 
-    print("{params.base} -> {params.target}")
+    print(f"{params.base} -> {params.target}")
     print(f"{params.n_way}-way {params.n_shot}-shot")
 
     utils.seed_everything(params.seed)
     support_loader, query_loader = create_eval_dataloaders(params)
-    finetune(support_loader, query_loader, params)
+    # finetune(support_loader, query_loader, params)
 
 
 if __name__ == "__main__":
