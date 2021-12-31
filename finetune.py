@@ -28,6 +28,7 @@ def finetune(support_loader, query_loader, params):
         print("Loading Model: ", params.embedding_load_path)
         embedding = torch.load(params.embedding_load_path)["model"]
         pretrained_model.weight.data.copy_(embedding)
+    pretrained_model.requires_grad = False
 
     classifier = Classifier(feature_dim, params.n_way).cuda()
 
