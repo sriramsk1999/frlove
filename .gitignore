@@ -21,5 +21,3 @@ data/base
 data/target
 
 *pkl
-train_*csv
-val_*csv

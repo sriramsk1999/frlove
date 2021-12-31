@@ -1,7 +1,6 @@
 """ Finetunes model and runs few-shot evaluation. """
 import os
 import argparse
-import copy
 import random
 
 import torch
@@ -10,6 +9,7 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 import fasttext
+from sklearn.preprocessing import LabelEncoder
 
 import utils
 from util_classes import Classifier, FastTextEmbeddingBag
@@ -93,17 +93,28 @@ def create_eval_dataloaders(params):
         if auth not in target_dataset_dict:
             target_dataset_dict[auth] = []
         target_dataset_dict[auth].append(sents)
+    # Integer encode labels
+    le = LabelEncoder()
+    le.fit(list(target_dataset_dict.keys()))
+    target_dataset_dict = {
+        le.transform([key])[0]: val for key, val in target_dataset_dict.items()
+    }
 
-    # Extract n_way, n_shot, n_query
+    # Extract n_items
     n_items = params.n_shot + params.n_query  # Total number of samples required
     target_dataset_dict = {
         auth: random.sample(sents, n_items)
         for auth, sents in target_dataset_dict.items()
     }
 
-    def create_subset_loader(start, end, dataset):
+    def create_subset_loader(start, end, n_way, dataset):
         subset = {auth: sents[start:end] for auth, sents in dataset.items()}
-        subset = [(auth, sents) for sents in subset[auth] for auth in subset.keys()]
+        # Extract n_way
+        subset = [
+            (auth, sents)
+            for sents in subset[auth]
+            for auth in random.sample(subset.keys(), n_way)
+        ]
         subset_loader = torch.utils.data.DataLoader(
             subset,
             batch_size=params.bsize,
@@ -112,9 +123,11 @@ def create_eval_dataloaders(params):
         )
         return subset_loader
 
-    support_loader = create_subset_loader(0, params.n_shot, target_dataset_dict)
+    support_loader = create_subset_loader(
+        0, params.n_shot, params.n_way, target_dataset_dict
+    )
     query_loader = create_subset_loader(
-        params.n_shot, params.n_query, target_dataset_dict
+        params.n_shot, params.n_query, params.n_way, target_dataset_dict
     )
     return support_loader, query_loader
 
