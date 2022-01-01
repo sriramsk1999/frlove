@@ -4,16 +4,11 @@ Based on STARTUP
 
 1. Create a virtual environment and download the following libraries.
 
-- torch
-- pandas
-- sklearn
-- tqdm
-- wget
-- textblob
-- fasttext
-- gensim==3.8.3
-- textaugment
-- gutenberg
+```sh
+python -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
 
 2. Download raw data and process it (Prepare base for French and German, target for English)
 
@@ -22,20 +17,26 @@ python prepare_data.py --base fr --target en
 python prepare_data.py --base de --target en
 ```
 
-3. Train a teacher model, used for pseudolabeling in STARTUP (train a french teacher)
+3. Train a teacher model, used for pseudolabeling in STARTUP (train french and german teachers)
 
 ```sh
 python train_teacher.py --base fr
+python train_teacher.py --base de
 ```
 
-4. Run STARTUP
+4. Run STARTUP - train student models
 
 ```sh
 python startup.py --base fr --target en
+python startup.py --base de --target en
 ```
 
-5. Evaluate STARTUP and Naive Transfer (WIP)
+5. Evaluate STARTUP and Naive Transfer
 
 ```sh
-python finetune.py --base fr --target en
+python finetune.py --base fr --target en --n_way 5
+python finetune.py --embedding_load_path student_fr_en_best.pkl --base fr --target en --n_way 5
+
+python finetune.py --base de --target en --n_way 5
+python finetune.py --embedding_load_path student_de_en_best.pkl --base de --target en --n_way 5
 ```

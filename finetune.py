@@ -152,18 +152,6 @@ if __name__ == "__main__":
     parser.add_argument(
         "--save_dir", default=".", type=str, help="Directory to save the result csv"
     )
-    parser.add_argument(
-        "--n_shot",
-        default=5,
-        type=int,
-        help="number of labeled data in each class, same as n_support",
-    )
-    parser.add_argument(
-        "--n_way", default=5, type=int, help="class num to classify for training"
-    )
-    parser.add_argument(
-        "--n_query", default=15, type=int, help="Number of query examples per class"
-    )
     parser.add_argument("--seed", type=int, default=42, help="Seed for randomness")
     parser.add_argument(
         "--num_workers", type=int, default=8, help="Number of workers for dataloader"
@@ -173,6 +161,22 @@ if __name__ == "__main__":
         "--embedding_load_path",
         type=str,
         help="path to load STARTUP embedding.",
+    )
+    parser.add_argument(
+        "--n_shot",
+        default=5,
+        type=int,
+        help="number of labeled data in each class, same as n_support",
+    )
+    parser.add_argument(
+        "--n_query", default=15, type=int, help="Number of query examples per class"
+    )
+    parser.add_argument(
+        "--n_way",
+        default=5,
+        required=True,
+        type=int,
+        help="class num to classify for training",
     )
     parser.add_argument(
         "--base",
