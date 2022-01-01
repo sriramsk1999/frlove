@@ -20,8 +20,8 @@ python prepare_data.py --base de --target en
 3. Train a teacher model, used for pseudolabeling in STARTUP (train french and german teachers)
 
 ```sh
-python train_teacher.py --base fr
-python train_teacher.py --base de
+python train_teacher.py --lang fr
+python train_teacher.py --lang de
 ```
 
 4. Run STARTUP - train student models
