@@ -90,7 +90,7 @@ def main(args):
 
     # Train fasttext supervised model using pretrained vectors
     model = fasttext.train_supervised(
-        input=datafile, dim=300, pretrainedVectors=vecfile
+        input=datafile, dim=300, pretrainedVectors=vecfile, epoch=10
     )
 
     # Save model

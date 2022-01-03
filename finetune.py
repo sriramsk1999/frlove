@@ -41,7 +41,7 @@ def finetune(support_loader, query_loader, params):
         weight_decay=0.001,
     )
 
-    total_epoch = 20
+    total_epoch = 30
     pretrained_model.eval()
     classifier.train()
 
@@ -89,33 +89,31 @@ def create_eval_dataloaders(params):
     with open(target_datafile, "r", encoding="utf-8") as datafile:
         target_dataset = datafile.read().split("\n")
     target_dataset = [(i.split()[0], " ".join(i.split()[1:])) for i in target_dataset]
-    target_dataset_dict = {}  # Reverse dictionary to store author:[sentences, ..]
+    target_dataset_dict = {}  # Reverse dictionary to store {author:[sentences, ..], ..}
     for auth, sents in target_dataset:
         if auth not in target_dataset_dict:
             target_dataset_dict[auth] = []
         target_dataset_dict[auth].append(sents)
-    # Integer encode labels
-    le = LabelEncoder()
-    le.fit(list(target_dataset_dict.keys()))
-    target_dataset_dict = {
-        le.transform([key])[0]: val for key, val in target_dataset_dict.items()
-    }
 
-    # Extract n_items
-    n_items = params.n_shot + params.n_query  # Total number of samples required
+    # Extract n_items and n_way
+    n_items = params.n_shot + params.n_query
+    n_auth = random.sample(target_dataset_dict.keys(), params.n_way)
     target_dataset_dict = {
         auth: random.sample(sents, n_items)
         for auth, sents in target_dataset_dict.items()
+        if auth in n_auth
     }
 
-    def create_subset_loader(start, end, n_way, dataset):
+    def create_subset_loader(start, end, dataset):
         subset = {auth: sents[start:end] for auth, sents in dataset.items()}
-        # Extract n_way
-        subset = [
-            (sents, auth)
-            for auth in random.sample(subset.keys(), n_way)
-            for sents in subset[auth]
-        ]
+
+        # Integer encode labels
+        le = LabelEncoder()
+        le.fit(list(subset.keys()))
+        subset = {le.transform([key])[0]: val for key, val in subset.items()}
+
+        # Format and load
+        subset = [(sents, auth) for auth in subset.keys() for sents in subset[auth]]
         subset_loader = torch.utils.data.DataLoader(
             subset,
             batch_size=params.bsize,
@@ -124,11 +122,9 @@ def create_eval_dataloaders(params):
         )
         return subset_loader
 
-    support_loader = create_subset_loader(
-        0, params.n_shot, params.n_way, target_dataset_dict
-    )
+    support_loader = create_subset_loader(0, params.n_shot, target_dataset_dict)
     query_loader = create_subset_loader(
-        params.n_shot, params.n_query, params.n_way, target_dataset_dict
+        params.n_shot, params.n_shot + params.n_query, target_dataset_dict
     )
     return support_loader, query_loader
 
@@ -140,6 +136,10 @@ def main(params):
 
     print(f"{params.base} -> {params.target}")
     print(f"{params.n_way}-way {params.n_shot}-shot")
+    if params.embedding_load_path:
+        print("STARTUP")
+    else:
+        print("Naive Transfer")
 
     utils.seed_everything(params.seed)
     support_loader, query_loader = create_eval_dataloaders(params)
@@ -164,16 +164,15 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--n_shot",
-        default=5,
+        default=25,
         type=int,
         help="number of labeled data in each class, same as n_support",
     )
     parser.add_argument(
-        "--n_query", default=15, type=int, help="Number of query examples per class"
+        "--n_query", default=50, type=int, help="Number of query examples per class"
     )
     parser.add_argument(
         "--n_way",
-        default=5,
         required=True,
         type=int,
         help="class num to classify for training",

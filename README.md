@@ -1,6 +1,6 @@
-FrLove: Could a Frenchman rapidly learn to identify Lovecraft?
+# FrLove: Could a Frenchman rapidly learn to identify Lovecraft?
 
-Based on STARTUP
+**Based on [STARTUP](https://openreview.net/forum?id=O3Y56aqpChA)**
 
 1. Create a virtual environment and download the following libraries.
 
