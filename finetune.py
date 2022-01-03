@@ -164,7 +164,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--n_shot",
-        default=25,
+        default=15,
         type=int,
         help="number of labeled data in each class, same as n_support",
     )
