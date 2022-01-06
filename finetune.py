@@ -143,7 +143,7 @@ def main(params):
 
     utils.seed_everything(params.seed)
     support_loader, query_loader = create_eval_dataloaders(params)
-    acc = finetune(support_loader, query_loader, params)
+    acc = finetune(support_loader, query_loader, params)*100
     print(f"Test Acc = {acc:.2f}%")
 
 

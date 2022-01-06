@@ -307,7 +307,7 @@ def validate(
 
     loss_xtask = criterion_xtask(log_probability, ys_all)
 
-    loss_SIMCLR = sum(losses_simclr)
+    loss_SIMCLR = sum(losses_simclr)/len(losses_simclr)
 
     logits_base_all = []
     ys_base_all = []
