@@ -412,7 +412,7 @@ def main(args):
     ###########################
 
     # Load Teacher
-    model = fasttext.load_model(f"teacher-{args.base}.bin")
+    model = fasttext.load_model(f"teacher-{args.base}-{args.n_base}.bin")
     feature_dim = model.get_dimension()
     num_classes = len(model.labels)
 
@@ -501,7 +501,7 @@ def main(args):
                 optimizer,
                 scheduler,
                 os.path.join(
-                    args.dir, f"student_{args.base}_{args.target}_{epoch + 1}.pkl"
+                    args.dir, f"student_{args.base}_{args.n_base}_{args.target}_{epoch + 1}.pkl"
                 ),
                 epoch + 1,
             )
@@ -533,7 +533,7 @@ def main(args):
                     optimizer,
                     scheduler,
                     os.path.join(
-                        args.dir, f"student_{args.base}_{args.target}_best.pkl"
+                        args.dir, f"student_{args.base}_{args.n_base}_{args.target}_best.pkl"
                     ),
                     best_epoch,
                 )
@@ -583,6 +583,11 @@ if __name__ == "__main__":
     parser.add_argument(
         "--base",
         help="language of base dataset/teacher model e.g. French ='fr' ",
+        required=True,
+    )
+    parser.add_argument(
+        "--n_base",
+        help="number of base classes",
         required=True,
     )
     parser.add_argument(

@@ -25,12 +25,12 @@ python train_teacher.py --lang fr
 4. Run STARTUP - train student model
 
 ```sh
-python startup.py --base fr --target en
+python startup.py --base fr --target en --n_base 5
 ```
 
 5. Evaluate STARTUP and Naive Transfer
 
 ```sh
-python finetune.py --base fr --target en --n_way 5
-python finetune.py --embedding_load_path student_fr_en_best.pkl --base fr --target en --n_way 5
+python finetune.py --base fr --target en --n_way 5 --n_base 5
+python finetune.py --embedding_load_path student_fr_en_best.pkl --base fr --target en --n_way 5 --n_base 5
 ```

@@ -19,7 +19,7 @@ def finetune(support_loader, query_loader, params):
     """Finetune and evaluate model on dataset."""
 
     # Load teacher into FastTextEmbeddingBag
-    pretrained_model = fasttext.load_model(f"teacher-{params.base}.bin")
+    pretrained_model = fasttext.load_model(f"teacher-{params.base}-{params.n_base}.bin")
     feature_dim = pretrained_model.get_dimension()
     pretrained_model = FastTextEmbeddingBag(pretrained_model)
     # Path to STARTUP embedding. Replaces the fasttext embeddings
@@ -180,6 +180,11 @@ if __name__ == "__main__":
     parser.add_argument(
         "--base",
         help="language of base dataset and teacher model e.g. French ='fr' ",
+        required=True,
+    )
+    parser.add_argument(
+        "--n_base",
+        help="number of base classes",
         required=True,
     )
     parser.add_argument(
