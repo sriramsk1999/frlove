@@ -4,6 +4,7 @@ Prepare Project Gutenberg data
 import os
 import argparse
 import json
+import random
 from gutenberg.acquire import load_etext
 from gutenberg.cleanup import strip_headers
 from textblob import TextBlob
@@ -37,17 +38,26 @@ def download_raw_data():
         print(f"Downloaded data for {lang}!")
 
 
-def create_base_dataset(lang):
+def create_base_dataset(lang, n_base=None):
     """Create base dataset in FastText format."""
 
     if not os.path.isdir(f"data/raw/{lang}"):
         raise IOError(f"Data for {lang} does not exist in data/raw.")
+
+    # Create list of authors to be considered as base clases
+    authors = set(
+        [filename.split("-")[0] for filename in os.listdir(f"data/raw/{lang}")]
+    )
+    if n_base:
+        authors = random.sample(authors, n_base)
 
     data = []
     chunk_size = 10
     # Load all text files in lang/
     for filename in os.listdir(f"data/raw/{lang}"):
         author = filename.split("-")[0]
+        if author not in authors:
+            continue
         with open(f"data/raw/{lang}/{filename}", "r", encoding="utf-8") as txtfile:
             txtblob = TextBlob(txtfile.read())
         # Split book into chunks of sentences
@@ -112,13 +122,19 @@ if __name__ == "__main__":
         help="Language for target dataset - [en, fr, de]",
         required=True,
     )
+    parser.add_argument(
+        "--n_base",
+        help="Number of base classes",
+        type=int,
+        required=True,
+    )
     args = parser.parse_args()
 
     nltk.download("punkt")
 
     download_raw_data()
     print("Raw data download complete.\n------------------------------------")
-    create_base_dataset(args.base)
+    create_base_dataset(args.base, args.n_base)
     print(
         f"Base dataset for {args.base} created.\n------------------------------------"
     )

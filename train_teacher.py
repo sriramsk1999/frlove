@@ -94,7 +94,7 @@ def main(args):
     )
 
     # Save model
-    model.save_model(f"teacher-{args.lang}.bin")
+    model.save_model(f"teacher-{args.lang}-{len(model.labels)}.bin")
 
 
 if __name__ == "__main__":

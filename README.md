@@ -10,25 +10,22 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-2. Download raw data and process it (Prepare base for French and German, target for English)
+2. Download raw data and process it (Prepare base for French, target for English)
 
 ```sh
-python prepare_data.py --base fr --target en
-python prepare_data.py --base de --target en
+python prepare_data.py --base fr --target en --n_base 5
 ```
 
-3. Train a teacher model, used for pseudolabeling in STARTUP (train french and german teachers)
+3. Train a teacher model, used for pseudolabeling in STARTUP (train french teacher)
 
 ```sh
 python train_teacher.py --lang fr
-python train_teacher.py --lang de
 ```
 
-4. Run STARTUP - train student models
+4. Run STARTUP - train student model
 
 ```sh
 python startup.py --base fr --target en
-python startup.py --base de --target en
 ```
 
 5. Evaluate STARTUP and Naive Transfer
@@ -36,7 +33,4 @@ python startup.py --base de --target en
 ```sh
 python finetune.py --base fr --target en --n_way 5
 python finetune.py --embedding_load_path student_fr_en_best.pkl --base fr --target en --n_way 5
-
-python finetune.py --base de --target en --n_way 5
-python finetune.py --embedding_load_path student_de_en_best.pkl --base de --target en --n_way 5
 ```

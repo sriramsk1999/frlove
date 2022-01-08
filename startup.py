@@ -307,7 +307,7 @@ def validate(
 
     loss_xtask = criterion_xtask(log_probability, ys_all)
 
-    loss_SIMCLR = sum(losses_simclr)/len(losses_simclr)
+    loss_SIMCLR = sum(losses_simclr) / len(losses_simclr)
 
     logits_base_all = []
     ys_base_all = []
@@ -563,7 +563,7 @@ if __name__ == "__main__":
         "--wd", type=float, default=1e-4, help="Weight decay for the model"
     )
     parser.add_argument(
-        "--epochs", type=int, default=20, help="Number of training epochs"
+        "--epochs", type=int, default=10, help="Number of training epochs"
     )
     parser.add_argument(
         "--save_freq", type=int, default=5, help="Frequency (in epoch) to save"
