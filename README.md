@@ -1,5 +1,7 @@
 # FrLove: Could a Frenchman rapidly learn to identify Lovecraft?
 
+## See [blogpost](https://sriramsk1999.github.io/posts/2022/04/frlove/) for more details on this project
+
 **Based on [STARTUP](https://openreview.net/forum?id=O3Y56aqpChA)**
 
 1. Create a virtual environment and download the following libraries.
